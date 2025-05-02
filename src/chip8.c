@@ -1,11 +1,34 @@
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+#include <time.h>
+#include <assert.h>
 
 #include "chip8.h"
 
 /// ********************
 /// Chip8 functions    *
 /// ********************
+
+static const uint8_t chip8_fontset[80] = {
+    0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
+    0x20, 0x60, 0x20, 0x20, 0x70, // 1
+    0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
+    0xF0, 0x10, 0xF0, 0x10, 0xF0, // 3
+    0x90, 0x90, 0xF0, 0x10, 0x10, // 4
+    0xF0, 0x80, 0xF0, 0x10, 0xF0, // 5
+    0xF0, 0x80, 0xF0, 0x90, 0xF0, // 6
+    0xF0, 0x10, 0x20, 0x40, 0x40, // 7
+    0xF0, 0x90, 0xF0, 0x90, 0xF0, // 8
+    0xF0, 0x90, 0xF0, 0x10, 0xF0, // 9
+    0xF0, 0x90, 0xF0, 0x90, 0x90, // A
+    0xE0, 0x90, 0xE0, 0x90, 0xE0, // B
+    0xF0, 0x80, 0x80, 0x80, 0xF0, // C
+    0xE0, 0x90, 0x90, 0x90, 0xE0, // D
+    0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
+    0xF0, 0x80, 0xF0, 0x80, 0x80  // F
+};
+
 void chip8_init(Chip8 *chip8)
 {
     memset(chip8->memory, 0, sizeof(chip8->memory));
@@ -15,6 +38,13 @@ void chip8_init(Chip8 *chip8)
 
     stack_init(&chip8->stack);
 
+    // Load fontset into memory
+    for (uint16_t i = 0; i < 80; i++)
+    {
+        // Load at 0x50
+        chip8->memory[0x50 + i] = chip8_fontset[i];
+    }
+
     chip8->I = 0;
 
     // Program starts at 0x200
@@ -22,6 +52,9 @@ void chip8_init(Chip8 *chip8)
 
     chip8->delay_timer = 0;
     chip8->sound_timer = 0;
+
+    // Seed rand()
+    srand(time(NULL));
 }
 int chip8_load_rom(Chip8 *chip8, const char *filename)
 {
@@ -42,6 +75,15 @@ int chip8_load_rom(Chip8 *chip8, const char *filename)
 
     return 0;
 }
+
+void chip8_pass_input(Chip8 *chip8, uint8_t input[])
+{
+    for (uint8_t i = 0; i < CHIP8_NUM_KEYS; i++)
+    {
+        chip8->keypad[i] = input[i];
+    }
+}
+
 void chip8_cycle(Chip8 *chip8)
 {
     // fetch-decode-execute one cycle
@@ -72,9 +114,6 @@ void chip8_cycle(Chip8 *chip8)
 
 void chip8_execute_opcode(Chip8 *chip8, uint16_t opcode)
 {
-
-    // CHIP-8 instructions are divided into broad categories by the first “nibble”, or “half-byte”,
-    // which is the first hexadecimal number.
 
     // Instruction
     // Nib1 Nib2 Nib3 Nib4
@@ -113,35 +152,55 @@ void chip8_execute_opcode(Chip8 *chip8, uint16_t opcode)
 
         // 00EE Return from subroutine
         case 0x00EE:
-            // TODO
+            printf("00EE");
+            chip8->pc = stack_pop(&chip8->stack);
             break;
 
         default:
+            printf("Unknown instruction");
             break;
         }
 
         break;
 
-    // 1NNN
+    // 1NNN Jump
     case 0x1:
         printf("1NNN Jump      - PC set to %X", NNN);
         chip8->pc = NNN;
         break;
 
+    // 2NNN Jump to subroutine
     case 0x2:
-        /* code */
+        printf("2NNN");
+        stack_push(&chip8->stack, chip8->pc);
+        chip8->pc = NNN;
         break;
 
+    // 3XNN Skip one instruction if VX == NN
     case 0x3:
-        /* code */
+        printf("3XNN Skip      - Skip one instruction if %X == %X", chip8->V[X], NN);
+        if (chip8->V[X] == NN)
+        {
+            chip8->pc += 2;
+        }
         break;
 
+    // 4XNN Skip one instruction if VX != NN
     case 0x4:
-        /* code */
+        printf("4XNN");
+        if (chip8->V[X] != NN)
+        {
+            chip8->pc += 2;
+        }
         break;
 
+    // 5XY0 Skip one instruction if VX == VY
     case 0x5:
-        /* code */
+        printf("5XY0");
+        if (chip8->V[X] == chip8->V[Y])
+        {
+            chip8->pc += 2;
+        }
         break;
 
     // 6XNN Set
@@ -159,11 +218,76 @@ void chip8_execute_opcode(Chip8 *chip8, uint16_t opcode)
         break;
 
     case 0x8:
-        /* code */
+        printf("8XYN");
+        switch (N)
+        {
+        // 8XY0 Set
+        case 0x0:
+            chip8->V[X] = chip8->V[Y];
+            break;
+
+        // 8XY1 OR
+        case 0x1:
+            chip8->V[X] |= chip8->V[Y];
+            break;
+
+        // 8XY2 AND
+        case 0x2:
+            chip8->V[X] &= chip8->V[Y];
+            break;
+
+        // 8XY3 XOR
+        case 0x3:
+            chip8->V[X] ^= chip8->V[Y];
+            break;
+
+        // 8XY5 Add with carry
+        case 0x4:
+        {
+            uint16_t sum = chip8->V[X] + chip8->V[Y];
+            chip8->V[0xF] = (sum > 0xFF) ? 1 : 0;
+            chip8->V[X] = sum & 0xFF;
+            break;
+        }
+
+        // 8XY5 Subtract with borrow (VX - VY)
+        case 0x5:
+            chip8->V[0xF] = (chip8->V[X] >= chip8->V[Y]) ? 1 : 0;
+            chip8->V[X] = chip8->V[X] - chip8->V[Y];
+            break;
+
+        // 8XY6 Shift right
+        case 0x6:
+            chip8->V[0xF] = chip8->V[X] & 0x1;
+            chip8->V[X] >>= 1;
+            break;
+
+        // 8XY7 Subtract with borrow (VY-VX)
+        case 0x7:
+            chip8->V[0xF] = (chip8->V[Y] >= chip8->V[X]) ? 1 : 0;
+            chip8->V[X] = chip8->V[Y] - chip8->V[X];
+            break;
+
+        // 8XY6 Shift left
+        case 0xE:
+            chip8->V[0xF] = (chip8->V[X] >> 7) & 1;
+            chip8->V[X] <<= 1;
+            break;
+
+        default:
+            printf("Unknown instruction");
+            break;
+        }
+
         break;
 
+    // 9XY0 Skip one instruction if VX != VY
     case 0x9:
-        /* code */
+        printf("9XY0");
+        if (chip8->V[X] != chip8->V[Y])
+        {
+            chip8->pc += 2;
+        }
         break;
 
     // ANNN Set index
@@ -172,13 +296,20 @@ void chip8_execute_opcode(Chip8 *chip8, uint16_t opcode)
         chip8->I = NNN;
         break;
 
+    // BNNN Jump to NNN + V0
     case 0xB:
-        /* code */
+        printf("BNNN");
+        chip8->pc = NNN + chip8->V[0];
         break;
 
+    // CXNN Random
     case 0xC:
-        /* code */
+    {
+        printf("CXNN");
+        uint8_t random_number = (uint8_t)(rand() % 256);
+        chip8->V[X] = random_number & NN;
         break;
+    }
 
     // DXYN Draw
     case 0xD:
@@ -205,7 +336,7 @@ void chip8_execute_opcode(Chip8 *chip8, uint16_t opcode)
             uint16_t memory_location = chip8->I + i;
             uint8_t sprite_row = chip8->memory[memory_location];
 
-            // Skip empty spite rows
+            // Skip empty sprite rows
             if (sprite_row == 0)
             {
                 y_coord++;
@@ -245,13 +376,16 @@ void chip8_execute_opcode(Chip8 *chip8, uint16_t opcode)
     }
     case 0xE:
         /* code */
+        printf("E Not implemented");
         break;
 
     case 0xF:
         /* code */
+        printf("F Not implemented");
         break;
 
     default:
+        printf("Unknown instruction");
         break;
     }
 }
@@ -280,7 +414,7 @@ void stack_push(Stack *stack, uint16_t value)
     stack->arr[stack->top] = value;
 }
 
-uint16_t stacK_pop(Stack *stack)
+uint16_t stack_pop(Stack *stack)
 {
     assert(stack->top != -1 && "Stack underflow in pop()");
 

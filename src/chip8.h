@@ -2,7 +2,6 @@
 #define CHIP8_H
 
 #include <stdint.h>
-#include <assert.h>
 
 enum
 {
@@ -10,7 +9,8 @@ enum
     CHIP8_STACK_SIZE = 64,
     CHIP8_NUM_VAR_REGISTERS = 16,
     CHIP8_SCREEN_WIDTH = 64,
-    CHIP8_SCREEN_HEIGHT = 32
+    CHIP8_SCREEN_HEIGHT = 32,
+    CHIP8_NUM_KEYS = 16
 };
 
 typedef struct
@@ -44,7 +44,7 @@ typedef struct
     uint8_t display[CHIP8_SCREEN_WIDTH * CHIP8_SCREEN_HEIGHT];
 
     // Keypad
-    uint8_t keypad[16];
+    uint8_t keypad[CHIP8_NUM_KEYS];
 
 } Chip8;
 
@@ -53,7 +53,7 @@ void chip8_init(Chip8 *chip8);
 int chip8_load_rom(Chip8 *chip8, const char *filename);
 void chip8_cycle(Chip8 *chip8);
 void chip8_execute_opcode(Chip8 *chip8, uint16_t opcode);
-void chip8_update_timers(Chip8 *chip8);
+void chip8_pass_input(Chip8 *chip8, uint8_t input[]);
 
 // Stack
 void stack_init(Stack *stack);
