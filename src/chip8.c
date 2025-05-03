@@ -10,6 +10,8 @@
 /// Chip8 functions    *
 /// ********************
 
+#define CHIP8_DEBUG 1
+
 static const uint8_t chip8_fontset[80] = {
     0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
     0x20, 0x60, 0x20, 0x20, 0x70, // 1
@@ -436,6 +438,10 @@ void chip8_execute_opcode(Chip8 *chip8, uint16_t opcode)
 
         // FX0A Get key
         case 0x0A:
+            // Assume no key is pressed
+            // since we always do +2 after fetch, we need -2 to "block" execution of next instruction
+            chip8->pc -= 2;
+
             // Check if a key is pressed
             // Just take the first occurence of a pressed key (since multiple can be set to 1)
             for (uint8_t i = 0; i < CHIP8_NUM_KEYS; i++)
@@ -443,10 +449,13 @@ void chip8_execute_opcode(Chip8 *chip8, uint16_t opcode)
                 if (chip8->keypad[i] == 1)
                 {
                     chip8->V[X] = i;
+
+                    // If a key was pressed, set it back to the next instruction
                     chip8->pc += 2;
                     break;
                 }
             }
+
             break;
 
         // FX29 Font character
@@ -494,6 +503,10 @@ void chip8_execute_opcode(Chip8 *chip8, uint16_t opcode)
         printf("Unknown instruction");
         break;
     }
+}
+
+void chip8_debug_print()
+{
 }
 
 /// ********************
