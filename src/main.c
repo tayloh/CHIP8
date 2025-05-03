@@ -8,7 +8,7 @@
 
 #define CYCLES_PER_SECOND 700
 #define REFRESH_RATE 60
-#define CHIP8_DISPLAY_SCALE 10
+#define CHIP8_DISPLAY_SCALE 20
 
 void get_input(uint8_t input[])
 {
@@ -80,9 +80,9 @@ int main(int argc, char *argv[])
 {
 
     // Init chip8
-    if (argc < 2)
+    if (argc < 3)
     {
-        printf("Usage: chip8 <rom_file>\n");
+        printf("Usage: chip8 <rom_file> <clock frequency>\n");
         return 1;
     }
 
@@ -96,6 +96,8 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+    const int clock_frequency = atoi(argv[2]);
+
     // --
 
     // Init raylib
@@ -106,15 +108,10 @@ int main(int argc, char *argv[])
     Texture2D texture = LoadTextureFromImage(image);
     UnloadImage(image); // Don't need image after loading texture
 
-    if (argc = 3)
-    {
+    InitAudioDevice();
+    Sound beep = LoadSound("assets/beep.wav");
 
-        SetTargetFPS(atoi(argv[2]));
-    }
-    else
-    {
-        SetTargetFPS(REFRESH_RATE);
-    }
+    SetTargetFPS(REFRESH_RATE);
 
     // For timers
     float timer_accumulator = 0.0f;
@@ -125,17 +122,16 @@ int main(int argc, char *argv[])
 
     while (!WindowShouldClose())
     {
-        // for (int i = 0; i < CYCLES_PER_SECOND / REFRESH_RATE; i++)
-        // {
-        //     chip8_cycle(&chip8);
-        // }
 
         // Handle input
         get_input(input_array);
         chip8_pass_input(&chip8, input_array);
 
         // Handle cycle
-        chip8_cycle(&chip8);
+        for (int i = 0; i < clock_frequency / REFRESH_RATE; i++)
+        {
+            chip8_cycle(&chip8);
+        }
 
         // Handle timers
         float frame_time = GetFrameTime();
@@ -169,9 +165,16 @@ int main(int argc, char *argv[])
         BeginDrawing();
         DrawTextureEx(texture, (Vector2){0, 0}, 0.0f, CHIP8_DISPLAY_SCALE, WHITE);
         EndDrawing();
+
+        if (chip8.sound_timer > 0)
+        {
+            PlaySound(beep);
+        }
     }
 
     UnloadTexture(texture);
+    UnloadSound(beep);
+    CloseAudioDevice();
     CloseWindow();
 
     return 0;

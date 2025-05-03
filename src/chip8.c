@@ -128,10 +128,19 @@ void chip8_execute_opcode(Chip8 *chip8, uint16_t opcode)
     // Decode instruction
     uint8_t instruction_category = (opcode >> 12) & 0xF;
 
+    // Nib2
     uint8_t X = (opcode >> 8) & 0xF;
+
+    // Nib3
     uint8_t Y = (opcode >> 4) & 0xF;
+
+    // Nib4
     uint8_t N = opcode & 0xF;
+
+    // Second byte (Nib3 Nib4)
     uint8_t NN = opcode & 0xFF;
+
+    // Nib2 Nib3 Nib4
     uint16_t NNN = opcode & 0xFFF;
 
     // printf("instruction: category=%X X=%X Y=%X N=%X NN=%X NNN=%X\n", instruction_category, X, Y, N, NN, NNN);
@@ -375,13 +384,110 @@ void chip8_execute_opcode(Chip8 *chip8, uint16_t opcode)
         break;
     }
     case 0xE:
-        /* code */
-        printf("E Not implemented");
+
+        switch (NN)
+        {
+        // EX9E Skip if key pressed
+        case 0x9E:
+            if (chip8->keypad[chip8->V[X]] == 1)
+            {
+                chip8->pc += 2;
+            }
+            break;
+
+        // EXA1 Skip if key not pressed
+        case 0xA1:
+            if (chip8->keypad[chip8->V[X]] == 0)
+            {
+                chip8->pc += 2;
+            }
+            break;
+
+        default:
+            printf("Unknown instruction");
+            break;
+        }
+
         break;
 
     case 0xF:
-        /* code */
-        printf("F Not implemented");
+
+        switch (NN)
+        {
+        // FX07 Set VX to delay timer value
+        case 0x07:
+            chip8->V[X] = chip8->delay_timer;
+            break;
+
+        // FX15 Set delay timer
+        case 0x15:
+            chip8->delay_timer = chip8->V[X];
+            break;
+
+        // FX18 Set sound timer
+        case 0x18:
+            chip8->sound_timer = chip8->V[X];
+            break;
+
+        // FX1E Add to index
+        case 0x1E:
+            chip8->I += chip8->V[X];
+            break;
+
+        // FX0A Get key
+        case 0x0A:
+            // Check if a key is pressed
+            // Just take the first occurence of a pressed key (since multiple can be set to 1)
+            for (uint8_t i = 0; i < CHIP8_NUM_KEYS; i++)
+            {
+                if (chip8->keypad[i] == 1)
+                {
+                    chip8->V[X] = i;
+                    chip8->pc += 2;
+                    break;
+                }
+            }
+            break;
+
+        // FX29 Font character
+        case 0x29:
+            // Font character memory location is 0x50 + vx * 5 (each character is 5 bytes)
+            chip8->I = 0x50 + chip8->V[X] * 5;
+            break;
+
+        // FX33 Binary-coded decimal conversion
+        case 0x33:
+        {
+            uint8_t operand = chip8->V[X];
+            for (uint8_t i = 2; i >= 0; i--)
+            {
+                chip8->memory[chip8->I + i] = operand % 10;
+                operand /= 10;
+            }
+            break;
+        }
+
+        // FX55 Store V memory (from V regs to memory at I)
+        case 0x55:
+            for (uint8_t i = 0; i <= X; i++)
+            {
+                chip8->memory[chip8->I + i] = chip8->V[i];
+            }
+            break;
+
+        // FX65 Load V memory (loads from memory at I to V regs)
+        case 0x65:
+            for (uint8_t i = 0; i <= X; i++)
+            {
+                chip8->V[i] = chip8->memory[chip8->I + i];
+            }
+            break;
+
+        default:
+            printf("Unknown instruction");
+            break;
+        }
+
         break;
 
     default:
