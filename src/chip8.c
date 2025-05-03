@@ -510,11 +510,11 @@ void chip8_execute_opcode(Chip8 *chip8, uint16_t opcode)
         case 0x33:
         {
             uint8_t operand = chip8->V[X];
-            for (uint8_t i = 2; i >= 0; i--)
-            {
-                chip8->memory[chip8->I + i] = operand % 10;
-                operand /= 10;
-            }
+            chip8->memory[chip8->I + 2] = operand % 10;
+            operand /= 10;
+            chip8->memory[chip8->I + 1] = operand % 10;
+            operand /= 10;
+            chip8->memory[chip8->I + 0] = operand % 10;
 
             chip8_debug_printf(chip8, "FX33 F%X33 Binary-coded decimal conversion of VX into memory at I", X);
             break;
