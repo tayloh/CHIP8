@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#define CHIP8_DEBUG 1
+
 enum
 {
     CHIP8_MEMORY_SIZE = 4096,
@@ -54,6 +56,7 @@ int chip8_load_rom(Chip8 *chip8, const char *filename);
 void chip8_cycle(Chip8 *chip8);
 void chip8_execute_opcode(Chip8 *chip8, uint16_t opcode);
 void chip8_pass_input(Chip8 *chip8, uint8_t input[]);
+void chip8_debug_printf(Chip8 *chip8, const char *format, ...);
 
 // Stack
 void stack_init(Stack *stack);

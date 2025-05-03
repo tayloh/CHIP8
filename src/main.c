@@ -82,7 +82,7 @@ int main(int argc, char *argv[])
     // Init chip8
     if (argc < 3)
     {
-        printf("Usage: chip8 <rom_file> <clock frequency>\n");
+        printf("Usage: chip8 <rom_file> <clock frequency>\n", REFRESH_RATE);
         return 1;
     }
 
@@ -95,12 +95,22 @@ int main(int argc, char *argv[])
         printf("Error: Could not load ROM file '%s'. Exiting...\n", argv[1]);
         return 1;
     }
+    else
+    {
+        printf("Info: ROM file loaded...\n");
+    }
 
     const int clock_frequency = atoi(argv[2]);
+    printf("Info: Clock frequency set to %d\n\n\n", clock_frequency);
 
     // --
 
     // Init raylib
+    if (CHIP8_DEBUG == 0)
+    {
+        SetTraceLogLevel(LOG_ERROR);
+    }
+
     InitWindow(CHIP8_SCREEN_WIDTH * CHIP8_DISPLAY_SCALE, CHIP8_SCREEN_HEIGHT * CHIP8_DISPLAY_SCALE, "taylohs CHIP8");
 
     // Create a blank texture
@@ -111,7 +121,18 @@ int main(int argc, char *argv[])
     InitAudioDevice();
     Sound beep = LoadSound("assets/beep.wav");
 
-    SetTargetFPS(REFRESH_RATE);
+    // If the input clock_frequency is lower than 60, just match it with the refresh rate
+    uint16_t cycles_per_frame;
+    if (clock_frequency < REFRESH_RATE)
+    {
+        cycles_per_frame = 1;
+        SetTargetFPS(clock_frequency);
+    }
+    else
+    {
+        cycles_per_frame = clock_frequency / REFRESH_RATE;
+        SetTargetFPS(REFRESH_RATE);
+    }
 
     // For timers
     float timer_accumulator = 0.0f;
@@ -128,7 +149,7 @@ int main(int argc, char *argv[])
         chip8_pass_input(&chip8, input_array);
 
         // Handle cycle
-        for (int i = 0; i < clock_frequency / REFRESH_RATE; i++)
+        for (int i = 0; i < cycles_per_frame; i++)
         {
             chip8_cycle(&chip8);
         }
