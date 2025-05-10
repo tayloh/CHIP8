@@ -584,11 +584,6 @@ void stack_push(Stack *stack, uint16_t value)
 {
     stack->top++;
 
-    if (stack->top == CHIP8_STACK_SIZE)
-    {
-        printf("Stack overflow");
-        return;
-    }
     assert(stack->top != CHIP8_STACK_SIZE && "Stack overflow in push()");
 
     stack->arr[stack->top] = value;
